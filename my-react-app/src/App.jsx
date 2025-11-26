@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const CURRENT_USER_ID = 5
@@ -93,7 +93,7 @@ function App() {
       fetchChatByUser(selectedUser.id)
       fetchUserDetails(selectedUser.id)
     }
-  }, [selectedUser])
+  }, [fetchChatByUser, fetchUserDetails, selectedUser])
 
   const filteredUsers = useMemo(() => {
     const term = userSearch.toLowerCase()
@@ -120,6 +120,7 @@ function App() {
       const payload = await response.json()
       setUsers(payload?.data ?? payload ?? sampleUsers)
     } catch (error) {
+      console.error('fetchUsers failed', error)
       setStatusMessage('Using sample users because the API could not be reached.')
       setUsers(sampleUsers)
     }
@@ -134,12 +135,13 @@ function App() {
       const payload = await response.json()
       setGroups(payload?.data ?? payload ?? sampleGroups)
     } catch (error) {
+      console.error('fetchGroups failed', error)
       setStatusMessage('Group list is showing fallback data.')
       setGroups(sampleGroups)
     }
   }
 
-  const fetchUserDetails = async (userId) => {
+  const fetchUserDetails = useCallback(async (userId) => {
     try {
       const response = await fetch(`${API_BASE.replace('mock-test', 'mock-test')}/user/${userId}`)
       if (!response.ok) {
@@ -148,6 +150,7 @@ function App() {
       const payload = await response.json()
       setUserDetails(payload?.data ?? payload ?? null)
     } catch (error) {
+      console.error('fetchUserDetails failed', error)
       const fallbackUser = users.find((person) => person.id === userId)
       setUserDetails(
         fallbackUser
@@ -155,9 +158,9 @@ function App() {
           : null,
       )
     }
-  }
+  }, [users])
 
-  const fetchChatByUser = async (userId) => {
+  const fetchChatByUser = useCallback(async (userId) => {
     try {
       const response = await fetch(`${API_BASE}/chatByUserId/${userId}`)
       if (!response.ok) {
@@ -166,10 +169,11 @@ function App() {
       const payload = await response.json()
       setChatMessages(payload?.data ?? payload ?? sampleMessages)
     } catch (error) {
+      console.error('fetchChatByUser failed', error)
       const fallback = sampleMessages.map((msg) => ({ ...msg, toUser: userId, fromUser: msg.fromUser }))
       setChatMessages(fallback)
     }
-  }
+  }, [])
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedUser) {
@@ -203,6 +207,7 @@ function App() {
       await fetchChatByUser(selectedUser.id)
       setStatusMessage('Message sent and synced with the server.')
     } catch (error) {
+      console.error('sendMessage failed', error)
       setStatusMessage('Message sent locally. API unreachable so it might not persist.')
     }
   }
@@ -213,14 +218,14 @@ function App() {
     }
 
     const userMessage = { role: 'user', content: aiInput.trim() }
-    setAiMessages((prev) => [...prev, userMessage])
+    const updatedMessages = [...aiMessages, userMessage]
+    setAiMessages(updatedMessages)
     setAiInput('')
     const key = import.meta.env.VITE_OPENAI_API_KEY
 
     if (!key) {
-      setAiMessages((prev) => [
-        ...prev,
-        userMessage,
+      setAiMessages([
+        ...updatedMessages,
         { role: 'assistant', content: 'Add your AI API key to the VITE_OPENAI_API_KEY env variable to chat with AI.' },
       ])
       return
@@ -238,8 +243,7 @@ function App() {
           model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: 'You are a concise, friendly chat assistant inside a messaging app UI mock.' },
-            ...aiMessages,
-            userMessage,
+            ...updatedMessages,
           ],
         }),
       })
@@ -252,6 +256,7 @@ function App() {
       const reply = payload?.choices?.[0]?.message?.content ?? 'The AI did not return a response.'
       setAiMessages((prev) => [...prev, { role: 'assistant', content: reply }])
     } catch (error) {
+      console.error('sendAiMessage failed', error)
       setAiMessages((prev) => [
         ...prev,
         { role: 'assistant', content: 'Unable to reach the AI right now. Please try again later.' },
