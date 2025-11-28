@@ -173,6 +173,30 @@
   display: block;
 }
 
+.date-separator {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #6b7280;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.date-separator::before,
+.date-separator::after {
+  content: '';
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+}
+
+.bubble p {
+  margin: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .person-row {
   cursor: pointer;
   border: 1px solid #f0f1ff;

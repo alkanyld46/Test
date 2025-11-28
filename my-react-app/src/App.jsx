@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const CURRENT_USER_ID = 5
@@ -27,29 +27,67 @@ const normalizeMessage = (message) =>
     }
     : message
 
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return 'Just now'
+const parseTimestamp = (timestamp) => {
+  if (!timestamp) return null
 
-  let date
+  if (timestamp instanceof Date) return timestamp
 
   // If it's a number or numeric string, assume it's a Unix timestamp
   if (typeof timestamp === 'number' || /^\d+$/.test(timestamp)) {
-    // adjust depending on what your backend sends:
-    // - seconds  -> * 1000
-    // - millis   -> use directly
+
     const tsNum = Number(timestamp)
-    date = tsNum < 10_000_000_000 ? new Date(tsNum * 1000) : new Date(tsNum)
-  } else {
-    // ISO string like "2025-11-28T12:34:56Z"
-    date = new Date(timestamp)
+    const millis = tsNum < 10_000_000_000 ? tsNum * 1000 : tsNum
+    return new Date(millis)
   }
 
-  if (Number.isNaN(date.getTime())) return 'Just now'
+  const date = new Date(timestamp)
+  return Number.isNaN(date.getTime()) ? null : date
+}
 
+const formatTimestamp = (timestamp) => {
+  const date = parseTimestamp(timestamp)
+
+  if (!date) return 'Just now'
   // Example: "09:22" in local time
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+const formatDateLabel = (timestamp) => {
+  const date = parseTimestamp(timestamp)
+  if (!date) return 'Unknown date'
+
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+
+  const isSameDay = (first, second) =>
+    first.getFullYear() === second.getFullYear()
+    && first.getMonth() === second.getMonth()
+    && first.getDate() === second.getDate()
+
+  if (isSameDay(date, today)) return 'Today'
+  if (isSameDay(date, yesterday)) return 'Yesterday'
+
+  return date.toLocaleDateString([], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+const dateKey = (timestamp) => {
+  const date = parseTimestamp(timestamp)
+  if (!date) return 'unknown'
+
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+const getMessageTimestamp = (message) => message?.timestamp ?? message?.createdAt
 
 const navItems = [
   { label: 'Dashboard', icon: '🏠' },
@@ -143,7 +181,7 @@ function App() {
       console.error('fetchUserDetails failed', error)
       setUserDetails(null)
     }
-  }, [users])
+  }, [])
 
   const fetchChatByUser = useCallback(async (userId) => {
     try {
@@ -171,13 +209,15 @@ function App() {
     if (!newMessage.trim() || !selectedUser) {
       return
     }
+    const nowIso = new Date().toISOString()
 
     const optimisticMessage = {
       id: crypto.randomUUID(),
       fromUser: CURRENT_USER_ID,
       toUser: selectedUser.id,
       message: newMessage.trim(),
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: nowIso,
+      createdAt: nowIso,
     }
 
     setChatMessages((prev) => [...prev, optimisticMessage])
@@ -213,50 +253,91 @@ function App() {
     const updatedMessages = [...aiMessages, userMessage]
     setAiMessages(updatedMessages)
     setAiInput('')
+
     const key = import.meta.env.VITE_OPENAI_API_KEY
+    console.log('OpenAI key prefix:', key ? key.slice(0, 8) : 'MISSING')
 
     if (!key) {
       setAiMessages([
         ...updatedMessages,
-        { role: 'assistant', content: 'Add your AI API key to the VITE_OPENAI_API_KEY env variable to chat with AI.' },
+        {
+          role: 'assistant',
+          content:
+            'Add your AI API key to the VITE_OPENAI_API_KEY env variable to chat with AI.',
+        },
       ])
       return
     }
 
     setAiLoading(true)
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Build input in the format from the Responses API docs
+      const inputMessages = [
+        {
+          role: 'developer',
+          content:
+            'You are a concise, friendly chat assistant inside a messaging app UI mock.',
+        },
+        ...updatedMessages.map((m) => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content,
+        })),
+      ]
+
+      const res = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a concise, friendly chat assistant inside a messaging app UI mock.' },
-            ...updatedMessages,
-          ],
+          model: 'gpt-5-nano', // <– use a model from the docs you pasted
+          input: inputMessages,
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Unable to reach AI model')
+      const text = await res.text()
+      console.log('AI raw status:', res.status)
+      console.log('AI raw body:', text)
+
+      if (!res.ok) {
+        throw new Error(`AI API request failed with status ${res.status}`)
       }
 
-      const payload = await response.json()
-      const reply = payload?.choices?.[0]?.message?.content ?? 'The AI did not return a response.'
+      const payload = JSON.parse(text)
+
+      // Extract text from payload.output[]
+      let reply = 'The AI did not return a response.'
+      if (Array.isArray(payload.output)) {
+        for (const item of payload.output) {
+          if (item.type === 'message' && Array.isArray(item.content)) {
+            const textPart = item.content.find(
+              (part) => part.type === 'output_text',
+            )
+            if (textPart?.text) {
+              reply = textPart.text
+              break
+            }
+          }
+        }
+      }
+
       setAiMessages((prev) => [...prev, { role: 'assistant', content: reply }])
     } catch (error) {
-      console.error('sendAiMessage failed', error)
+      console.error('sendAiMessage failed:', error)
       setAiMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: 'Unable to reach the AI right now. Please try again later.' },
+        {
+          role: 'assistant',
+          content:
+            'Unable to reach the AI right now. Please check the console for details.',
+        },
       ])
     } finally {
       setAiLoading(false)
     }
   }
+
 
   return (
     <div className="app-shell">
@@ -305,16 +386,23 @@ function App() {
               <button className="pill">+ Create</button>
             </div>
             <div className="group-list">
-              {groups.map((group) => (
-                <div className="group-row" key={group.id}>
-                  <div className="avatar" aria-hidden="true" />
-                  <div>
-                    <p className="title">{group.name}</p>
-                    <p className="caption"> unread</p>
+              {groups.map((group) => {
+                const memberCount = group.users?.length ?? 0
+
+                return (
+                  <div className="group-row" key={group.id}>
+                    <div className="avatar" aria-hidden="true" />
+                    <div>
+                      <p className="title">{group.name}</p>
+                      <p className="caption">
+                        {memberCount} member{memberCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
+
           </div>
 
           <div className="people-card">
@@ -400,33 +488,46 @@ function App() {
           </header>
 
           <div className="message-thread">
-            {filteredMessages.map((chat) => {
+            {filteredMessages.map((chat, index) => {
               const isMine = Number(chat.fromUser) === CURRENT_USER_ID
+              const timestampValue = getMessageTimestamp(chat)
+
+              const currentDateKey = dateKey(timestampValue)
+              const previousTimestamp = getMessageTimestamp(filteredMessages[index - 1])
+              const previousDateKey = index > 0 ? dateKey(previousTimestamp) : null
+              const showDivider = currentDateKey !== previousDateKey
 
               return (
-                <div key={chat.id} className={`message-row ${isMine ? 'mine' : ''}`}>
-                  {!isMine && <div className="avatar tiny" aria-hidden="true" />}
+                <Fragment key={chat.id}>
+                  {showDivider && (
+                    <div className="date-separator" aria-label={`Messages from ${formatDateLabel(timestampValue)}`}>
+                      <span>{formatDateLabel(timestampValue)}</span>
+                    </div>
+                  )}
+                  <div className={`message-row ${isMine ? 'mine' : ''}`}>
+                    {!isMine && <div className="avatar tiny" aria-hidden="true" />}
 
-                  <div className="bubble">
-                    {/* Text message (if present) */}
-                    {chat.message && <p>{chat.message}</p>}
+                    <div className="bubble">
+                      {/* Text message (if present) */}
+                      {chat.message && <p>{chat.message}</p>}
 
-                    {/* Image attachment (only if it exists) */}
-                    {chat.image && (
-                      <div className="chat-image-wrapper">
-                        <img
-                          src={chat.image}
-                          alt="Chat attachment"
-                          className="chat-image"
-                        />
-                      </div>
-                    )}
+                      {/* Image attachment (only if it exists) */}
+                      {chat.image && (
+                        <div className="chat-image-wrapper">
+                          <img
+                            src={chat.image}
+                            alt="Chat attachment"
+                            className="chat-image"
+                          />
+                        </div>
+                      )}
 
-                    <span className="caption">
-                      {formatTimestamp(chat.timestamp)}
-                    </span>
+                      <span className="caption">
+                        {formatTimestamp(timestampValue)}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </Fragment>
               )
             })}
           </div>
