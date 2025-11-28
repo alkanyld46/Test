@@ -2,49 +2,45 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const CURRENT_USER_ID = 5
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/chatSystem'
+const API_BASE = 'https://mock-test.worthycodes.com/api/chatSystem'
 
-const normalizeUsers = (payload) =>
-  (payload?.data ?? payload ?? [])
-    .filter((user) => user && user.id)
-    .map((user) => ({
-      id: user.id,
-      name: user.name ?? user.username ?? 'Unknown',
-      job: user.job ?? user.position ?? '—',
-      phone: user.phone,
-      address: user.address,
-      email: user.email,
-      profileImage: user.profileImage,
-    }))
+const sampleUsers = [
+  { id: 1, name: 'Lola Davis', job: 'Product Designer' },
+  { id: 2, name: 'Gavin Hahan', job: 'UI/UX Designer' },
+  { id: 3, name: 'Nahum Rubio', job: 'Motion Designer' },
+  { id: 4, name: 'Ruth Amery', job: 'Illustrator' },
+  { id: 6, name: 'Cole Strickland', job: 'Developer' },
+]
 
-const normalizeGroups = (payload) =>
-  (payload?.data ?? payload ?? [])
-    .filter((group) => group && group.id)
-    .map((group) => ({
-      id: group.id,
-      name: group.name ?? 'Group',
-      unread: group.unread ?? 0,
-      users: group.users ?? [],
-    }))
+const sampleGroups = [
+  { id: 'ball', name: 'Bola Club', unread: 2 },
+  { id: 'mobile', name: 'Monobola Std', unread: 0 },
+  { id: 'pogi', name: 'Omari Pogsi', unread: 3 },
+]
 
-const formatTimestamp = (timestamp) => {
-  if (!timestamp) return 'Just now'
-  const numeric = Number(timestamp)
-  const millis = numeric > 10_000_000_000 ? numeric : numeric * 1000
-  return new Date(millis).toLocaleString()
-}
-
-const normalizeChats = (payload) =>
-  (payload?.data ?? payload ?? [])
-    .filter((chat) => chat && chat.id)
-    .map((chat) => ({
-      id: chat.id,
-      fromUser: chat.fromUser,
-      toUser: chat.toUser,
-      message: chat.message,
-      createdAt: chat.createdAt ?? formatTimestamp(chat.timestamp),
-      image: chat.image,
-    }))
+const sampleMessages = [
+  {
+    id: 1,
+    fromUser: 3,
+    toUser: CURRENT_USER_ID,
+    message: 'We are coming to our meeting. Are you available on that time? Let me know as soon as possible.',
+    createdAt: '09:20 AM',
+  },
+  {
+    id: 2,
+    fromUser: CURRENT_USER_ID,
+    toUser: 3,
+    message: "Yup, I'm available. I just want to review the tasks.",
+    createdAt: '09:22 AM',
+  },
+  {
+    id: 3,
+    fromUser: 3,
+    toUser: CURRENT_USER_ID,
+    message: 'I will send you the brief after we reach the office.',
+    createdAt: '09:25 AM',
+  },
+]
 
 const navItems = [
   { label: 'Dashboard', icon: '🏠' },
@@ -66,11 +62,11 @@ const attachmentSamples = [
 ]
 
 function App() {
-  const [users, setUsers] = useState([])
-  const [groups, setGroups] = useState([])
+  const [users, setUsers] = useState(sampleUsers)
+  const [groups, setGroups] = useState(sampleGroups)
   const [selectedUser, setSelectedUser] = useState(null)
   const [userDetails, setUserDetails] = useState(null)
-  const [chatMessages, setChatMessages] = useState([])
+  const [chatMessages, setChatMessages] = useState(sampleMessages)
   const [userSearch, setUserSearch] = useState('')
   const [messageSearch, setMessageSearch] = useState('')
   const [newMessage, setNewMessage] = useState('')
@@ -81,11 +77,24 @@ function App() {
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
+  useEffect(() => {
+    fetchUsers()
+    fetchGroups()
+  }, [])
+
+  useEffect(() => {
+    if (users.length > 0 && !selectedUser) {
+      setSelectedUser(users[0])
+    }
+  }, [users, selectedUser])
+
+
+
   const filteredUsers = useMemo(() => {
     const term = userSearch.toLowerCase()
     return users.filter(
       (user) =>
-        (user.name ?? '').toLowerCase().includes(term) ||
+        user.name.toLowerCase().includes(term) ||
         (user.job && user.job.toLowerCase().includes(term)),
     )
   }, [users, userSearch])
@@ -97,70 +106,54 @@ function App() {
     )
   }, [chatMessages, messageSearch])
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = async () => {
     try {
       const response = await fetch(`${API_BASE}/users/list`)
       if (!response.ok) {
         throw new Error('Unable to load users')
       }
       const payload = await response.json()
-      setUsers(normalizeUsers(payload))
+      setUsers(payload?.data ?? payload ?? sampleUsers)
     } catch (error) {
       console.error('fetchUsers failed', error)
-      setStatusMessage('Unable to load users from the API.')
-      setUsers([])
+      setStatusMessage('Using sample users because the API could not be reached.')
+      setUsers(sampleUsers)
     }
-  }, [API_BASE])
+  }
 
-  const fetchGroups = useCallback(async () => {
+  const fetchGroups = async () => {
     try {
       const response = await fetch(`${API_BASE}/groups/list`)
       if (!response.ok) {
         throw new Error('Unable to load groups')
       }
       const payload = await response.json()
-      setGroups(normalizeGroups(payload))
+      setGroups(payload?.data ?? payload ?? sampleGroups)
     } catch (error) {
       console.error('fetchGroups failed', error)
-      setStatusMessage('Unable to load groups from the API.')
-      setGroups([])
+      setStatusMessage('Group list is showing fallback data.')
+      setGroups(sampleGroups)
     }
-  }, [API_BASE])
-
-  const fetchUserDetails = useCallback(
-    async (userId) => {
-      try {
-        const response = await fetch(`${API_BASE}/user/${userId}`)
-        if (!response.ok) {
-          throw new Error('Unable to load user details')
-        }
-        const payload = await response.json()
-        setUserDetails(normalizeUsers(payload)[0] ?? null)
-      } catch (error) {
-        console.error('fetchUserDetails failed', error)
-        setStatusMessage('Unable to load user details from the API.')
-        setUserDetails(null)
-      }
-    },
-    [API_BASE],
-  )
-
+  }
 
   const fetchUserDetails = useCallback(async (userId) => {
     try {
-      const response = await fetch(`${API_BASE}/user/${userId}`)
+      const response = await fetch(`${API_BASE.replace('mock-test', 'mock-test')}/user/${userId}`)
       if (!response.ok) {
         throw new Error('Unable to load user details')
       }
       const payload = await response.json()
-      setUserDetails(normalizeUsers(payload)[0] ?? null)
+      setUserDetails(payload?.data ?? payload ?? null)
     } catch (error) {
       console.error('fetchUserDetails failed', error)
-      setStatusMessage('Unable to load user details from the API.')
-      setUserDetails(null)
+      const fallbackUser = users.find((person) => person.id === userId)
+      setUserDetails(
+        fallbackUser
+          ? { ...fallbackUser, phone: '+62 812 6122 2811', address: 'Jl. Magnet No. 55, Jakarta' }
+          : null,
+      )
     }
-  }, [users, selectedUser])
-
+  }, [users])
 
   const fetchChatByUser = useCallback(async (userId) => {
     try {
@@ -169,11 +162,18 @@ function App() {
         throw new Error('Unable to load chat messages')
       }
       const payload = await response.json()
-      setChatMessages(normalizeChats(payload))
+      setChatMessages(payload?.data ?? payload ?? sampleMessages)
     } catch (error) {
       console.error('fetchChatByUser failed', error)
-      setStatusMessage('Unable to load chat messages from the API.')
-      setChatMessages([])
+      const fallback = sampleMessages.map((msg) => ({ ...msg, toUser: userId, fromUser: msg.fromUser }))
+      setChatMessages(fallback)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedUser) {
+      fetchChatByUser(selectedUser.id)
+      fetchUserDetails(selectedUser.id)
     }
   }, [fetchChatByUser, fetchUserDetails, selectedUser])
 
@@ -477,11 +477,11 @@ function App() {
             </div>
             <div className="detail-item">
               <p className="eyebrow">Phone</p>
-              <p className="title">{userDetails?.phone ?? 'Not available'}</p>
+              <p className="title">{userDetails?.phone ?? '+62 812 6122 2811'}</p>
             </div>
             <div className="detail-item">
               <p className="eyebrow">Address</p>
-              <p className="title">{userDetails?.address ?? 'Not available'}</p>
+              <p className="title">{userDetails?.address ?? 'Jl. Magnet No. 55, Jakarta, Indonesia'}</p>
             </div>
           </div>
 
