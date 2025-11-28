@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const CURRENT_USER_ID = 5
-const API_BASE = 'https://mock-test.worthycodes.com/api/chatSystem'
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/chatSystem'
 
 const sampleUsers = [
   { id: 1, name: 'Lola Davis', job: 'Product Designer' },
@@ -91,13 +91,16 @@ function App() {
 
 
   const filteredUsers = useMemo(() => {
-    const term = userSearch.toLowerCase()
-    return users.filter(
-      (user) =>
-        user.name.toLowerCase().includes(term) ||
-        (user.job && user.job.toLowerCase().includes(term)),
-    )
+    const term = (userSearch || '').toLowerCase()
+    return (users || [])
+      .filter((user) => user && (user.name || user.job)) // ignore totally broken entries
+      .filter((user) => {
+        const name = (user.name || '').toLowerCase()
+        const job = (user.job || '').toLowerCase()
+        return name.includes(term) || job.includes(term)
+      })
   }, [users, userSearch])
+
 
   const filteredMessages = useMemo(() => {
     const term = messageSearch.toLowerCase()
@@ -138,7 +141,7 @@ function App() {
 
   const fetchUserDetails = useCallback(async (userId) => {
     try {
-      const response = await fetch(`${API_BASE.replace('mock-test', 'mock-test')}/user/${userId}`)
+      const response = await fetch(`${API_BASE}/user/${userId}`)
       if (!response.ok) {
         throw new Error('Unable to load user details')
       }
