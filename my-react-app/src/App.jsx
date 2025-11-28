@@ -145,39 +145,35 @@ function App() {
     [API_BASE],
   )
 
-  const fetchChatByUser = useCallback(
-    async (userId) => {
-      try {
-        const response = await fetch(`${API_BASE}/chatByUserId/${userId}`)
-        if (!response.ok) {
-          throw new Error('Unable to load chat messages')
-        }
-        const payload = await response.json()
-        setChatMessages(normalizeChats(payload))
-      } catch (error) {
-        console.error('fetchChatByUser failed', error)
-        setStatusMessage('Unable to load chat messages from the API.')
-        setChatMessages([])
+
+  const fetchUserDetails = useCallback(async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE}/user/${userId}`)
+      if (!response.ok) {
+        throw new Error('Unable to load user details')
       }
-    },
-    [API_BASE],
-  )
-
-  useEffect(() => {
-    fetchUsers()
-    fetchGroups()
-  }, [])
-
-  useEffect(() => {
-    if (users.length > 0 && !selectedUser) {
-      setSelectedUser(users[0])
+      const payload = await response.json()
+      setUserDetails(normalizeUsers(payload)[0] ?? null)
+    } catch (error) {
+      console.error('fetchUserDetails failed', error)
+      setStatusMessage('Unable to load user details from the API.')
+      setUserDetails(null)
     }
   }, [users, selectedUser])
 
-  useEffect(() => {
-    if (selectedUser) {
-      fetchChatByUser(selectedUser.id)
-      fetchUserDetails(selectedUser.id)
+
+  const fetchChatByUser = useCallback(async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE}/chatByUserId/${userId}`)
+      if (!response.ok) {
+        throw new Error('Unable to load chat messages')
+      }
+      const payload = await response.json()
+      setChatMessages(normalizeChats(payload))
+    } catch (error) {
+      console.error('fetchChatByUser failed', error)
+      setStatusMessage('Unable to load chat messages from the API.')
+      setChatMessages([])
     }
   }, [fetchChatByUser, fetchUserDetails, selectedUser])
 
