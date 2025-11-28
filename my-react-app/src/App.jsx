@@ -3,6 +3,8 @@ import './App.css'
 
 const CURRENT_USER_ID = 5
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/chatSystem'
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+const GEMINI_MODEL = 'gemini-2.5-flash' // good, cheap, has free tier
 
 const normalizeId = (value) => {
   const asNumber = Number(value)
@@ -254,89 +256,100 @@ function App() {
     setAiMessages(updatedMessages)
     setAiInput('')
 
-    const key = import.meta.env.VITE_OPENAI_API_KEY
-    console.log('OpenAI key prefix:', key ? key.slice(0, 8) : 'MISSING')
-
-    if (!key) {
-      setAiMessages([
-        ...updatedMessages,
+    if (!GEMINI_API_KEY) {
+      setAiMessages((prev) => [
+        ...prev,
         {
           role: 'assistant',
           content:
-            'Add your AI API key to the VITE_OPENAI_API_KEY env variable to chat with AI.',
+            'Add your Gemini API key to the VITE_GEMINI_API_KEY env variable to chat with AI.',
         },
       ])
       return
     }
 
     setAiLoading(true)
-    try {
-      // Build input in the format from the Responses API docs
-      const inputMessages = [
-        {
-          role: 'developer',
-          content:
-            'You are a concise, friendly chat assistant inside a messaging app UI mock.',
-        },
-        ...updatedMessages.map((m) => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: m.content,
-        })),
-      ]
 
-      const res = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${key}`,
+    try {
+      // Convert our chat history into Gemini's "contents" format
+      const history = updatedMessages.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }))
+
+      const body = {
+        // Model name
+        model: GEMINI_MODEL,
+        // Simple system-style instruction as first message
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text:
+                  'You are a concise, friendly chat assistant inside a messaging app UI mock.',
+              },
+            ],
+          },
+          ...history,
+        ],
+      }
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify({
-          model: 'gpt-5-nano', // <– use a model from the docs you pasted
-          input: inputMessages,
-        }),
-      })
+      )
 
       const text = await res.text()
-      console.log('AI raw status:', res.status)
-      console.log('AI raw body:', text)
+      console.log('Gemini status:', res.status)
+      console.log('Gemini body:', text)
 
       if (!res.ok) {
-        throw new Error(`AI API request failed with status ${res.status}`)
+        let apiMsg = ''
+        try {
+          const json = JSON.parse(text)
+          apiMsg = json?.error?.message || ''
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(apiMsg || `Gemini API failed with status ${res.status}`)
       }
 
       const payload = JSON.parse(text)
 
-      // Extract text from payload.output[]
+      // Extract the model's reply: candidates[0].content.parts[].text
       let reply = 'The AI did not return a response.'
-      if (Array.isArray(payload.output)) {
-        for (const item of payload.output) {
-          if (item.type === 'message' && Array.isArray(item.content)) {
-            const textPart = item.content.find(
-              (part) => part.type === 'output_text',
-            )
-            if (textPart?.text) {
-              reply = textPart.text
-              break
-            }
-          }
+      const candidate = payload?.candidates?.[0]
+      const parts = candidate?.content?.parts || candidate?.content?.[0]?.parts
+
+      if (Array.isArray(parts)) {
+        const textPart = parts.find((p) => typeof p.text === 'string')
+        if (textPart?.text) {
+          reply = textPart.text
         }
       }
 
       setAiMessages((prev) => [...prev, { role: 'assistant', content: reply }])
     } catch (error) {
-      console.error('sendAiMessage failed:', error)
+      console.error('sendAiMessage (Gemini) failed:', error)
       setAiMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Unable to reach the AI right now. Please check the console for details.',
+          content: `Gemini error: ${error.message}`,
         },
       ])
     } finally {
       setAiLoading(false)
     }
   }
+
 
 
   return (
@@ -366,16 +379,6 @@ function App() {
         </aside>
 
         <section className="people-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Current location</p>
-              <h2>Chatting You</h2>
-            </div>
-            <div className="status">
-              <span className="status-dot" />
-              <span>Offline</span>
-            </div>
-          </div>
 
           <div className="group-card">
             <div className="card-head">
