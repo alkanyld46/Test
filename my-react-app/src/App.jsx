@@ -158,6 +158,19 @@ function App() {
     }
   }, [users, selectedUser])
 
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.trim().toLowerCase()
+
+    if (!term) return users
+
+    return users.filter((user) => {
+      const username = user.username?.toLowerCase() ?? ''
+      const position = user.position?.toLowerCase() ?? ''
+
+      return username.includes(term) || position.includes(term)
+    })
+  }, [userSearch, users])
+
   const filteredMessages = useMemo(() => {
     const term = messageSearch.toLowerCase()
     return chatMessages.filter((chat) =>
@@ -388,7 +401,7 @@ function App() {
     <div className="app-shell">
       <div className="dashboard">
         <aside className="sider">
-          <div className="brand">UMN</div>
+          <div className="brand">Joseph's Test App</div>
           <div className="nav">
             {navItems.map((item) => (
               <button
@@ -495,7 +508,7 @@ function App() {
               />
             </div>
             <div className="people-list">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <button
                   key={user.id}
                   type="button"
@@ -528,115 +541,117 @@ function App() {
         </section>
 
         <section className={`chat-panel ${isTabActive('chat') || isTabActive('ai') ? '' : 'mobile-hidden'}`}>
-          <header className="chat-header">
-            <button
-              className="user-meta"
-              type="button"
-              onClick={() => selectedUser && setIsDetailOpen(true)}
-              disabled={!selectedUser}
-            >
-              {userDetails?.profileImage ? (
-                <img
-                  src={userDetails.profileImage}
-                  alt={userDetails.username ?? 'User avatar'}
-                  className="avatar large"
+          <div className={`chat-window ${isTabActive('chat') ? '' : 'mobile-hidden-card'}`}>
+            <header className="chat-header">
+              <button
+                className="user-meta"
+                type="button"
+                onClick={() => selectedUser && setIsDetailOpen(true)}
+                disabled={!selectedUser}
+              >
+                {userDetails?.profileImage ? (
+                  <img
+                    src={userDetails.profileImage}
+                    alt={userDetails.username ?? 'User avatar'}
+                    className="avatar large"
+                  />
+                ) : (
+                  <div className="avatar large" aria-hidden="true" />
+                )}
+                <div>
+                  <p className="title">{selectedUser?.username ?? 'Select a person'}</p>
+                  <p className="caption">{selectedUser?.phone ?? 'Waiting for selection'}</p>
+                </div>
+              </button>
+              <div className="chat-header-actions">
+                <input
+                  className="input"
+                  placeholder="Search message"
+                  value={messageSearch}
+                  onChange={(event) => setMessageSearch(event.target.value)}
                 />
-              ) : (
-                <div className="avatar large" aria-hidden="true" />
-              )}
-              <div>
-                <p className="title">{selectedUser?.username ?? 'Select a person'}</p>
-                <p className="caption">{selectedUser?.phone ?? 'Waiting for selection'}</p>
+                <div className="icon-cluster">
+                  <span role="img" aria-label="phone">
+                    📞
+                  </span>
+                  <span role="img" aria-label="video">
+                    🎥
+                  </span>
+                  <span role="img" aria-label="more">
+                    ⋯
+                  </span>
+                </div>
               </div>
-            </button>
-            <div className="chat-header-actions">
-              <input
-                className="input"
-                placeholder="Search message"
-                value={messageSearch}
-                onChange={(event) => setMessageSearch(event.target.value)}
-              />
-              <div className="icon-cluster">
-                <span role="img" aria-label="phone">
-                  📞
-                </span>
-                <span role="img" aria-label="video">
-                  🎥
-                </span>
-                <span role="img" aria-label="more">
-                  ⋯
-                </span>
-              </div>
-            </div>
-          </header>
+            </header>
+            <div className="message-thread">
+              {filteredMessages.map((chat, index) => {
+                const isMine = Number(chat.fromUser) === CURRENT_USER_ID
+                const timestampValue = getMessageTimestamp(chat)
 
-          <div className={`message-thread ${isTabActive('chat') ? '' : 'mobile-hidden-card'}`}>
-            {filteredMessages.map((chat, index) => {
-              const isMine = Number(chat.fromUser) === CURRENT_USER_ID
-              const timestampValue = getMessageTimestamp(chat)
 
-              const currentDateKey = dateKey(timestampValue)
-              const previousTimestamp = getMessageTimestamp(filteredMessages[index - 1])
-              const previousDateKey = index > 0 ? dateKey(previousTimestamp) : null
-              const showDivider = currentDateKey !== previousDateKey
+                const currentDateKey = dateKey(timestampValue)
+                const previousTimestamp = getMessageTimestamp(filteredMessages[index - 1])
+                const previousDateKey = index > 0 ? dateKey(previousTimestamp) : null
+                const showDivider = currentDateKey !== previousDateKey
 
-              return (
-                <Fragment key={chat.id}>
-                  {showDivider && (
-                    <div className="date-separator" aria-label={`Messages from ${formatDateLabel(timestampValue)}`}>
-                      <span>{formatDateLabel(timestampValue)}</span>
+                return (
+                  <Fragment key={chat.id}>
+                    {showDivider && (
+                      <div className="date-separator" aria-label={`Messages from ${formatDateLabel(timestampValue)}`}>
+                        <span>{formatDateLabel(timestampValue)}</span>
+                      </div>
+                    )}
+                    <div className={`message-row ${isMine ? 'mine' : ''}`}>
+                      {!isMine && <div className="avatar tiny" aria-hidden="true" />}
+
+                      <div className="bubble">
+                        {/* Text message (if present) */}
+                        {chat.message && <p>{chat.message}</p>}
+
+                        {/* Image attachment (only if it exists) */}
+                        {chat.image && (
+                          <div className="chat-image-wrapper">
+                            <img
+                              src={chat.image}
+                              alt="Chat attachment"
+                              className="chat-image"
+                            />
+                          </div>
+                        )}
+
+                        <span className="caption">
+                          {formatTimestamp(timestampValue)}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  <div className={`message-row ${isMine ? 'mine' : ''}`}>
-                    {!isMine && <div className="avatar tiny" aria-hidden="true" />}
-
-                    <div className="bubble">
-                      {/* Text message (if present) */}
-                      {chat.message && <p>{chat.message}</p>}
-
-                      {/* Image attachment (only if it exists) */}
-                      {chat.image && (
-                        <div className="chat-image-wrapper">
-                          <img
-                            src={chat.image}
-                            alt="Chat attachment"
-                            className="chat-image"
-                          />
-                        </div>
-                      )}
-
-                      <span className="caption">
-                        {formatTimestamp(timestampValue)}
-                      </span>
-                    </div>
-                  </div>
-                </Fragment>
-              )
-            })}
-          </div>
-
-
-          <div className={`message-composer ${isTabActive('chat') ? '' : 'mobile-hidden-card'}`}>
-            <div className="input-shell">
-              <input
-                className="input"
-                placeholder="Type a message"
-                value={newMessage}
-                onChange={(event) => setNewMessage(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    sendMessage()
-                  }
-                }}
-              />
-              <div className="icons-inline">
-                <span title="Attachments">📎</span>
-                <span title="Emojis">😊</span>
-              </div>
+                  </Fragment>
+                )
+              })}
             </div>
-            <button className="pill primary" type="button" onClick={sendMessage}>
-              Send
-            </button>
+
+            <div className="message-composer">
+              <div className="input-shell">
+                <input
+                  className="input"
+                  placeholder="Type a message"
+                  value={newMessage}
+                  onChange={(event) => setNewMessage(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      sendMessage()
+                    }
+                  }}
+                />
+                <div className="icons-inline">
+                  <span title="Attachments">📎</span>
+                  <span title="Emojis">😊</span>
+                </div>
+              </div>
+              <button className="pill primary" type="button" onClick={sendMessage}>
+                Send
+              </button>
+            </div>
+
           </div>
 
           <div className={`ai-card ${isTabActive('ai') ? '' : 'mobile-hidden-card'}`}>
