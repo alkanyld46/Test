@@ -460,6 +460,46 @@
   border-radius: 12px;
 }
 
+.mobile-tab-bar {
+  display: none;
+  gap: 8px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 16px;
+  margin: 0 0 10px;
+  box-shadow: 0 12px 30px rgba(33, 41, 78, 0.08);
+  position: sticky;
+  top: 10px;
+  z-index: 15;
+}
+
+.mobile-tab {
+  flex: 1;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-tab.active {
+  background: linear-gradient(135deg, #7a6cf5, #b19cf9);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 26px rgba(124, 108, 246, 0.35);
+}
+
+.mobile-hidden {
+  display: none;
+}
+
+.mobile-hidden-card {
+  display: none;
+}
+
 .attachment-list {
   display: flex;
   flex-direction: column;
@@ -496,6 +536,10 @@
 
   .sider {
     display: none;
+  }
+
+  .mobile-tab-bar {
+    display: flex;
   }
 
   .chat-header {

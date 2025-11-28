@@ -1,4 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import './App.css'
 
 const CURRENT_USER_ID = 5
@@ -121,11 +127,30 @@ function App() {
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [activeMobileTab, setActiveMobileTab] = useState('chat')
 
   useEffect(() => {
     fetchUsers()
     fetchGroups()
   }, [])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.matchMedia('(max-width: 720px)').matches)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobile) {
+      setActiveMobileTab('chat')
+    }
+  }, [isMobile])
 
   useEffect(() => {
     if (users.length > 0 && !selectedUser) {
@@ -211,6 +236,8 @@ function App() {
   useEffect(() => {
     setIsDetailOpen(false)
   }, [selectedUser])
+
+  const isTabActive = useCallback((tab) => !isMobile || activeMobileTab === tab, [activeMobileTab, isMobile])
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedUser) {
@@ -383,9 +410,50 @@ function App() {
           </div>
         </aside>
 
-        <section className="people-panel">
+        {isMobile && (
+          <div className="mobile-tab-bar" role="tablist" aria-label="Mobile navigation">
+            <button
+              type="button"
+              className={`mobile-tab ${activeMobileTab === 'chat' ? 'active' : ''}`}
+              onClick={() => setActiveMobileTab('chat')}
+              role="tab"
+              aria-selected={activeMobileTab === 'chat'}
+            >
+              💬 Chat
+            </button>
+            <button
+              type="button"
+              className={`mobile-tab ${activeMobileTab === 'people' ? 'active' : ''}`}
+              onClick={() => setActiveMobileTab('people')}
+              role="tab"
+              aria-selected={activeMobileTab === 'people'}
+            >
+              👥 People
+            </button>
+            <button
+              type="button"
+              className={`mobile-tab ${activeMobileTab === 'groups' ? 'active' : ''}`}
+              onClick={() => setActiveMobileTab('groups')}
+              role="tab"
+              aria-selected={activeMobileTab === 'groups'}
+            >
+              🗂️ Groups
+            </button>
+            <button
+              type="button"
+              className={`mobile-tab ${activeMobileTab === 'ai' ? 'active' : ''}`}
+              onClick={() => setActiveMobileTab('ai')}
+              role="tab"
+              aria-selected={activeMobileTab === 'ai'}
+            >
+              🤖 AI
+            </button>
+          </div>
+        )}
 
-          <div className="group-card">
+        <section className={`people-panel ${isTabActive('people') || isTabActive('groups') ? '' : 'mobile-hidden'}`}>
+
+          <div className={`group-card ${isTabActive('groups') ? '' : 'mobile-hidden-card'}`}>
             <div className="card-head">
               <div>
                 <p className="eyebrow">Group</p>
@@ -413,7 +481,7 @@ function App() {
 
           </div>
 
-          <div className="people-card">
+          <div className={`people-card ${isTabActive('people') ? '' : 'mobile-hidden-card'}`}>
             <div className="card-head">
               <div>
                 <p className="eyebrow">Person</p>
@@ -432,8 +500,10 @@ function App() {
                   key={user.id}
                   type="button"
                   className={`person-row ${selectedUser?.id === user.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedUser(user)}
-                >
+                  onClick={() => {
+                    setSelectedUser(user)
+                    setActiveMobileTab('chat')
+                  }}                >
 
                   {user?.profileImage ? (
                     <img
@@ -457,7 +527,7 @@ function App() {
           </div>
         </section>
 
-        <section className="chat-panel">
+        <section className={`chat-panel ${isTabActive('chat') || isTabActive('ai') ? '' : 'mobile-hidden'}`}>
           <header className="chat-header">
             <button
               className="user-meta"
@@ -500,7 +570,7 @@ function App() {
             </div>
           </header>
 
-          <div className="message-thread">
+          <div className={`message-thread ${isTabActive('chat') ? '' : 'mobile-hidden-card'}`}>
             {filteredMessages.map((chat, index) => {
               const isMine = Number(chat.fromUser) === CURRENT_USER_ID
               const timestampValue = getMessageTimestamp(chat)
@@ -546,7 +616,7 @@ function App() {
           </div>
 
 
-          <div className="message-composer">
+          <div className={`message-composer ${isTabActive('chat') ? '' : 'mobile-hidden-card'}`}>
             <div className="input-shell">
               <input
                 className="input"
@@ -569,7 +639,7 @@ function App() {
             </button>
           </div>
 
-          <div className="ai-card">
+          <div className={`ai-card ${isTabActive('ai') ? '' : 'mobile-hidden-card'}`}>
             <div className="card-head">
               <div>
                 <p className="eyebrow">AI Chatbot</p>
