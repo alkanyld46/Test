@@ -120,6 +120,7 @@ function App() {
   ])
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -206,6 +207,10 @@ function App() {
       fetchUserDetails(selectedUser.id)
     }
   }, [fetchChatByUser, fetchUserDetails, selectedUser])
+
+  useEffect(() => {
+    setIsDetailOpen(false)
+  }, [selectedUser])
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedUser) {
@@ -454,7 +459,12 @@ function App() {
 
         <section className="chat-panel">
           <header className="chat-header">
-            <div className="user-meta">
+            <button
+              className="user-meta"
+              type="button"
+              onClick={() => selectedUser && setIsDetailOpen(true)}
+              disabled={!selectedUser}
+            >
               {userDetails?.profileImage ? (
                 <img
                   src={userDetails.profileImage}
@@ -468,7 +478,7 @@ function App() {
                 <p className="title">{selectedUser?.username ?? 'Select a person'}</p>
                 <p className="caption">{selectedUser?.phone ?? 'Waiting for selection'}</p>
               </div>
-            </div>
+            </button>
             <div className="chat-header-actions">
               <input
                 className="input"
@@ -596,43 +606,64 @@ function App() {
           {statusMessage && <p className="status-hint">{statusMessage}</p>}
         </section>
 
-        <aside className="detail-panel">
-          <div className="detail-card">
-            <div className="detail-header">
-              {userDetails?.profileImage ? (
-                <img
-                  src={userDetails.profileImage}
-                  alt={userDetails.username ?? 'User avatar'}
-                  className="avatar large"
-                />
-              ) : (
-                <div className="avatar large" aria-hidden="true" />
-              )}
+        {isDetailOpen && (
+          <div
+            className="modal-backdrop"
+            role="presentation"
+            onClick={() => setIsDetailOpen(false)}
+          >
+            <div
+              className="detail-card detail-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="User details"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="detail-header">
+                {userDetails?.profileImage ? (
+                  <img
+                    src={userDetails.profileImage}
+                    alt={userDetails.username ?? 'User avatar'}
+                    className="avatar large"
+                  />
+                ) : (
+                  <div className="avatar large" aria-hidden="true" />
+                )}
 
-              <div>
-                <p className="title">{userDetails?.username ?? 'User details'}</p>
-                <p className="caption">
-                  {userDetails?.position ?? 'Select a person to view more'}
-                </p>
+                <div>
+                  <p className="title">{userDetails?.username ?? 'User details'}</p>
+                  <p className="caption">
+                    {userDetails?.position ?? 'Select a person to view more'}
+                  </p>
+                </div>
+
+                <button
+                  className="close-btn"
+                  type="button"
+                  aria-label="Close details"
+                  onClick={() => setIsDetailOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="detail-item">
+                <p className="eyebrow">Phone</p>
+                <p className="title">{userDetails?.phone ?? 'Not provided'}</p>
+              </div>
+
+              <div className="detail-item">
+                <p className="eyebrow">Email</p>
+                <p className="title">{userDetails?.email ?? 'Not provided'}</p>
+              </div>
+
+              <div className="detail-item">
+                <p className="eyebrow">Address</p>
+                <p className="title">{userDetails?.address ?? 'Not provided'}</p>
               </div>
             </div>
-
-            <div className="detail-item">
-              <p className="eyebrow">Phone</p>
-              <p className="title">{userDetails?.phone ?? 'Not provided'}</p>
-            </div>
-
-            <div className="detail-item">
-              <p className="eyebrow">Email</p>
-              <p className="title">{userDetails?.email ?? 'Not provided'}</p>
-            </div>
-
-            <div className="detail-item">
-              <p className="eyebrow">Address</p>
-              <p className="title">{userDetails?.address ?? 'Not provided'}</p>
-            </div>
           </div>
-        </aside>
+        )}
       </div>
     </div>
   )

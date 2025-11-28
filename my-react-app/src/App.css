@@ -4,8 +4,8 @@
 
 .dashboard {
   display: grid;
-  grid-template-columns: 86px 320px 1fr 300px;
-  grid-template-areas: 'sider lists chat detail';
+  grid-template-columns: 86px 320px 1fr;
+  grid-template-areas: 'sider lists chat';
   gap: 20px;
   background: #f7f7ff;
   border-radius: 28px;
@@ -291,6 +291,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.user-meta:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .chat-header-actions {
@@ -398,23 +408,50 @@
   font-size: 13px;
 }
 
-.detail-panel {
-  grid-area: detail;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
 .detail-card {
+
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 20;
+}
+
+.detail-modal {
+  width: min(480px, 100%);
+  max-width: 520px;
+  animation: pop-in 180ms ease;
+  position: relative;
 }
 
 .detail-header {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.close-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.close-btn:hover {
+  color: #4b5563;
 }
 
 .detail-item {
@@ -431,15 +468,15 @@
 
 @media (max-width: 1200px) {
   .dashboard {
-    grid-template-columns: 76px 280px 1fr;
-    grid-template-areas: 'sider lists chat' 'sider lists detail';
+    grid-template-columns: 72px 260px 1fr;
+    grid-template-areas: 'sider lists chat';
   }
 }
 
 @media (max-width: 960px) {
   .dashboard {
     grid-template-columns: 70px 1fr;
-    grid-template-areas: 'sider chat' 'sider detail';
+    grid-template-areas: 'sider chat' 'sider lists';
   }
 
   /* .people-panel {
@@ -454,7 +491,7 @@
 
   .dashboard {
     grid-template-columns: 1fr;
-    grid-template-areas: 'chat' 'detail';
+    grid-template-areas: 'chat' 'lists';
   }
 
   .sider {
@@ -472,5 +509,21 @@
 
   .bubble {
     max-width: 100%;
+  }
+
+  .detail-modal {
+    width: 100%;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    transform: translateY(10px) scale(0.98);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
   }
 }
