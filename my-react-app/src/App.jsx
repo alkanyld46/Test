@@ -4,43 +4,28 @@ import './App.css'
 const CURRENT_USER_ID = 5
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/chatSystem'
 
-const sampleUsers = [
-  { id: 1, name: 'Lola Davis', job: 'Product Designer' },
-  { id: 2, name: 'Gavin Hahan', job: 'UI/UX Designer' },
-  { id: 3, name: 'Nahum Rubio', job: 'Motion Designer' },
-  { id: 4, name: 'Ruth Amery', job: 'Illustrator' },
-  { id: 6, name: 'Cole Strickland', job: 'Developer' },
-]
+const normalizeId = (value) => {
+  const asNumber = Number(value)
+  return Number.isNaN(asNumber) ? value : asNumber
+}
 
-const sampleGroups = [
-  { id: 'ball', name: 'Bola Club', unread: 2 },
-  { id: 'mobile', name: 'Monobola Std', unread: 0 },
-  { id: 'pogi', name: 'Omari Pogsi', unread: 3 },
-]
+const normalizeUser = (user) =>
+  user
+    ? {
+        ...user,
+        id: normalizeId(user.id),
+      }
+    : user
 
-const sampleMessages = [
-  {
-    id: 1,
-    fromUser: 3,
-    toUser: CURRENT_USER_ID,
-    message: 'We are coming to our meeting. Are you available on that time? Let me know as soon as possible.',
-    createdAt: '09:20 AM',
-  },
-  {
-    id: 2,
-    fromUser: CURRENT_USER_ID,
-    toUser: 3,
-    message: "Yup, I'm available. I just want to review the tasks.",
-    createdAt: '09:22 AM',
-  },
-  {
-    id: 3,
-    fromUser: 3,
-    toUser: CURRENT_USER_ID,
-    message: 'I will send you the brief after we reach the office.',
-    createdAt: '09:25 AM',
-  },
-]
+const normalizeMessage = (message) =>
+  message
+    ? {
+        ...message,
+        id: message.id ?? crypto.randomUUID(),
+        fromUser: normalizeId(message.fromUser),
+        toUser: normalizeId(message.toUser),
+      }
+    : message
 
 const navItems = [
   { label: 'Dashboard', icon: '🏠' },
@@ -56,17 +41,12 @@ const bottomNav = [
   { label: 'Logout', icon: '⏻' },
 ]
 
-const attachmentSamples = [
-  { name: 'trackingid.pdf', size: '424 KB' },
-  { name: 'trackingimage.pdf', size: '424 KB' },
-]
-
 function App() {
-  const [users, setUsers] = useState(sampleUsers)
-  const [groups, setGroups] = useState(sampleGroups)
+  const [users, setUsers] = useState([])
+  const [groups, setGroups] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [userDetails, setUserDetails] = useState(null)
-  const [chatMessages, setChatMessages] = useState(sampleMessages)
+  const [chatMessages, setChatMessages] = useState([])
   const [userSearch, setUserSearch] = useState('')
   const [messageSearch, setMessageSearch] = useState('')
   const [newMessage, setNewMessage] = useState('')
@@ -116,11 +96,12 @@ function App() {
         throw new Error('Unable to load users')
       }
       const payload = await response.json()
-      setUsers(payload?.data ?? payload ?? sampleUsers)
+      const incoming = payload?.data ?? payload ?? []
+      setUsers((incoming || []).map(normalizeUser))
     } catch (error) {
       console.error('fetchUsers failed', error)
-      setStatusMessage('Using sample users because the API could not be reached.')
-      setUsers(sampleUsers)
+      setStatusMessage('User list unavailable because the API could not be reached.')
+      setUsers([])
     }
   }
 
@@ -131,11 +112,11 @@ function App() {
         throw new Error('Unable to load groups')
       }
       const payload = await response.json()
-      setGroups(payload?.data ?? payload ?? sampleGroups)
+      setGroups(payload?.data ?? payload ?? [])
     } catch (error) {
       console.error('fetchGroups failed', error)
-      setStatusMessage('Group list is showing fallback data.')
-      setGroups(sampleGroups)
+      setStatusMessage('Group list unavailable because the API could not be reached.')
+      setGroups([])
     }
   }
 
@@ -146,15 +127,11 @@ function App() {
         throw new Error('Unable to load user details')
       }
       const payload = await response.json()
-      setUserDetails(payload?.data ?? payload ?? null)
+      const incoming = payload?.data ?? payload ?? null
+      setUserDetails(normalizeUser(incoming))
     } catch (error) {
       console.error('fetchUserDetails failed', error)
-      const fallbackUser = users.find((person) => person.id === userId)
-      setUserDetails(
-        fallbackUser
-          ? { ...fallbackUser, phone: '+62 812 6122 2811', address: 'Jl. Magnet No. 55, Jakarta' }
-          : null,
-      )
+      setUserDetails(null)
     }
   }, [users])
 
@@ -165,11 +142,11 @@ function App() {
         throw new Error('Unable to load chat messages')
       }
       const payload = await response.json()
-      setChatMessages(payload?.data ?? payload ?? sampleMessages)
+      const incoming = payload?.data ?? payload ?? []
+      setChatMessages((incoming || []).map(normalizeMessage))
     } catch (error) {
       console.error('fetchChatByUser failed', error)
-      const fallback = sampleMessages.map((msg) => ({ ...msg, toUser: userId, fromUser: msg.fromUser }))
-      setChatMessages(fallback)
+      setChatMessages([])
     }
   }, [])
 
@@ -335,7 +312,7 @@ function App() {
             <div className="card-head">
               <div>
                 <p className="eyebrow">Person</p>
-                <h3>All (32)</h3>
+                <h3>All ({users.length})</h3>
               </div>
               <input
                 className="input"
@@ -352,14 +329,13 @@ function App() {
                   className={`person-row ${selectedUser?.id === user.id ? 'selected' : ''}`}
                   onClick={() => setSelectedUser(user)}
                 >
-                  <div className="avatar" aria-hidden="true" />
-                  <div>
-                    <p className="title">{user.name}</p>
-                    <p className="caption">{user.job}</p>
-                  </div>
-                  <span className="time-stamp">12:55</span>
-                </button>
-              ))}
+                <div className="avatar" aria-hidden="true" />
+                <div>
+                  <p className="title">{user.name}</p>
+                  <p className="caption">{user.job}</p>
+                </div>
+              </button>
+            ))}
             </div>
           </div>
         </section>
@@ -396,7 +372,7 @@ function App() {
 
           <div className="message-thread">
             {filteredMessages.map((chat) => {
-              const isMine = chat.fromUser === CURRENT_USER_ID
+              const isMine = Number(chat.fromUser) === CURRENT_USER_ID
               return (
                 <div key={chat.id} className={`message-row ${isMine ? 'mine' : ''}`}>
                   {!isMine && <div className="avatar tiny" aria-hidden="true" />}
@@ -480,11 +456,11 @@ function App() {
             </div>
             <div className="detail-item">
               <p className="eyebrow">Phone</p>
-              <p className="title">{userDetails?.phone ?? '+62 812 6122 2811'}</p>
+              <p className="title">{userDetails?.phone ?? 'Not provided'}</p>
             </div>
             <div className="detail-item">
               <p className="eyebrow">Address</p>
-              <p className="title">{userDetails?.address ?? 'Jl. Magnet No. 55, Jakarta, Indonesia'}</p>
+              <p className="title">{userDetails?.address ?? 'Not provided'}</p>
             </div>
           </div>
 
@@ -493,18 +469,26 @@ function App() {
               <h3>Attachments</h3>
               <span className="eyebrow">+ add new</span>
             </div>
-            <div className="attachment-list">
-              {attachmentSamples.map((file) => (
-                <div className="attachment-row" key={file.name}>
-                  <span>📎</span>
-                  <div>
-                    <p className="title">{file.name}</p>
-                    <p className="caption">{file.size}</p>
+            {(userDetails?.attachments ?? []).length === 0 ? (
+              <p className="caption">No attachments available.</p>
+            ) : (
+              <div className="attachment-list">
+                {(userDetails?.attachments ?? []).map((file) => (
+                  <div className="attachment-row" key={file.name ?? file.id}>
+                    <span>📎</span>
+                    <div>
+                      <p className="title">{file.name ?? 'Unnamed file'}</p>
+                      <p className="caption">{file.size ?? ''}</p>
+                    </div>
+                    {file.url && (
+                      <a className="time-stamp" href={file.url} target="_blank" rel="noreferrer">
+                        Download
+                      </a>
+                    )}
                   </div>
-                  <span className="time-stamp">Download</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </aside>
       </div>
