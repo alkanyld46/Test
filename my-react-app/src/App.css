@@ -37,6 +37,11 @@
   margin-bottom: 32px;
 }
 
+.pill.primary {
+  cursor: pointer;
+  z-index: 9999;
+}
+
 .nav {
   display: flex;
   flex-direction: column;
@@ -301,7 +306,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 950px;
+  max-height: 0px;
 }
 
 .chat-window {
@@ -582,7 +587,7 @@
   .dashboard {
     grid-template-columns: 1fr;
     grid-template-areas: 'chat' 'lists';
-    padding-bottom: calc(var(--mobile-tab-bar-height) + 24px);
+    /* padding-bottom: calc(var(--mobile-tab-bar-height) + 24px); */
 
   }
 
@@ -597,13 +602,13 @@
   }
 
   .chat-panel {
-    min-height: calc(100vh - 80px);
+    /* min-height: calc(100vh - 80px); */
     position: relative;
   }
 
   .message-thread {
     flex: 1;
-    max-height: none;
+    max-height: 450px;
     min-height: 0;
     padding-bottom: calc(var(--mobile-tab-bar-height) + 70px);
   }
@@ -636,7 +641,7 @@
 
   .message-composer {
     position: sticky;
-    bottom: 0;
+    bottom: 0px;
   }
 
   .ai-card {

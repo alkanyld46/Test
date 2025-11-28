@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react'
 import './App.css'
+import { v4 as uuidv4 } from 'uuid'
 
 const CURRENT_USER_ID = 5
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api/chatSystem'
@@ -259,7 +260,7 @@ function App() {
     const nowIso = new Date().toISOString()
 
     const optimisticMessage = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID ? crypto.randomUUID() : uuidv4(),
       fromUser: CURRENT_USER_ID,
       toUser: selectedUser.id,
       message: newMessage.trim(),
@@ -401,7 +402,7 @@ function App() {
     <div className="app-shell">
       <div className="dashboard">
         <aside className="sider">
-          <div className="brand">Joseph's Test App</div>
+          <div className="brand">J.T.A</div>
           <div className="nav">
             {navItems.map((item) => (
               <button
@@ -583,7 +584,7 @@ function App() {
                 </div>
               </div>
             </header>
-            <div className="message-thread">
+            <div className="message-thread" style={{ paddingBottom: "0px" }}>
               {filteredMessages.map((chat, index) => {
                 const isMine = Number(chat.fromUser) === CURRENT_USER_ID
                 const timestampValue = getMessageTimestamp(chat)
@@ -643,8 +644,8 @@ function App() {
                   }}
                 />
                 <div className="icons-inline">
-                  <span title="Attachments">📎</span>
-                  <span title="Emojis">😊</span>
+                  {/* <span title="Attachments">📎</span>
+                  <span title="Emojis">😊</span> */}
                 </div>
               </div>
               <button className="pill primary" type="button" onClick={sendMessage}>
