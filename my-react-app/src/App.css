@@ -162,6 +162,17 @@
   border: 1px solid transparent;
 }
 
+.chat-image-wrapper {
+  margin-top: 0.5rem;
+  max-width: 220px;
+}
+
+.chat-image {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
 .person-row {
   cursor: pointer;
   border: 1px solid #f0f1ff;
@@ -407,9 +418,9 @@
     grid-template-areas: 'sider chat' 'sider detail';
   }
 
-  .people-panel {
+  /* .people-panel {
     display: none;
-  }
+  } */
 }
 
 @media (max-width: 720px) {

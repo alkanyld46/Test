@@ -12,20 +12,44 @@ const normalizeId = (value) => {
 const normalizeUser = (user) =>
   user
     ? {
-        ...user,
-        id: normalizeId(user.id),
-      }
+      ...user,
+      id: normalizeId(user.id),
+    }
     : user
 
 const normalizeMessage = (message) =>
   message
     ? {
-        ...message,
-        id: message.id ?? crypto.randomUUID(),
-        fromUser: normalizeId(message.fromUser),
-        toUser: normalizeId(message.toUser),
-      }
+      ...message,
+      id: message.id ?? crypto.randomUUID(),
+      fromUser: normalizeId(message.fromUser),
+      toUser: normalizeId(message.toUser),
+    }
     : message
+
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'Just now'
+
+  let date
+
+  // If it's a number or numeric string, assume it's a Unix timestamp
+  if (typeof timestamp === 'number' || /^\d+$/.test(timestamp)) {
+    // adjust depending on what your backend sends:
+    // - seconds  -> * 1000
+    // - millis   -> use directly
+    const tsNum = Number(timestamp)
+    date = tsNum < 10_000_000_000 ? new Date(tsNum * 1000) : new Date(tsNum)
+  } else {
+    // ISO string like "2025-11-28T12:34:56Z"
+    date = new Date(timestamp)
+  }
+
+  if (Number.isNaN(date.getTime())) return 'Just now'
+
+  // Example: "09:22" in local time
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 
 const navItems = [
   { label: 'Dashboard', icon: '🏠' },
@@ -68,20 +92,6 @@ function App() {
     }
   }, [users, selectedUser])
 
-
-
-  const filteredUsers = useMemo(() => {
-    const term = (userSearch || '').toLowerCase()
-    return (users || [])
-      .filter((user) => user && (user.name || user.job)) // ignore totally broken entries
-      .filter((user) => {
-        const name = (user.name || '').toLowerCase()
-        const job = (user.job || '').toLowerCase()
-        return name.includes(term) || job.includes(term)
-      })
-  }, [users, userSearch])
-
-
   const filteredMessages = useMemo(() => {
     const term = messageSearch.toLowerCase()
     return chatMessages.filter((chat) =>
@@ -97,7 +107,7 @@ function App() {
       }
       const payload = await response.json()
       const incoming = payload?.data ?? payload ?? []
-      setUsers((incoming || []).map(normalizeUser))
+      setUsers(incoming)
     } catch (error) {
       console.error('fetchUsers failed', error)
       setStatusMessage('User list unavailable because the API could not be reached.')
@@ -300,9 +310,8 @@ function App() {
                   <div className="avatar" aria-hidden="true" />
                   <div>
                     <p className="title">{group.name}</p>
-                    <p className="caption">{group.unread} unread</p>
+                    <p className="caption"> unread</p>
                   </div>
-                  {group.unread > 0 && <span className="badge">{group.unread}</span>}
                 </div>
               ))}
             </div>
@@ -322,20 +331,32 @@ function App() {
               />
             </div>
             <div className="people-list">
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <button
                   key={user.id}
                   type="button"
                   className={`person-row ${selectedUser?.id === user.id ? 'selected' : ''}`}
                   onClick={() => setSelectedUser(user)}
                 >
-                <div className="avatar" aria-hidden="true" />
-                <div>
-                  <p className="title">{user.name}</p>
-                  <p className="caption">{user.job}</p>
-                </div>
-              </button>
-            ))}
+
+                  {user?.profileImage ? (
+                    <img
+                      src={user.profileImage}
+                      alt={user.username ?? 'User avatar'}
+                      className="avatar large"
+                    />
+                  ) : (
+                    <div className="avatar large" aria-hidden="true" />
+                  )}
+
+
+
+                  <div>
+                    <p className="title">{user.username}</p>
+                    <p className="caption">{user.position}</p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </section>
@@ -343,10 +364,18 @@ function App() {
         <section className="chat-panel">
           <header className="chat-header">
             <div className="user-meta">
-              <div className="avatar large" aria-hidden="true" />
+              {userDetails?.profileImage ? (
+                <img
+                  src={userDetails.profileImage}
+                  alt={userDetails.username ?? 'User avatar'}
+                  className="avatar large"
+                />
+              ) : (
+                <div className="avatar large" aria-hidden="true" />
+              )}
               <div>
-                <p className="title">{selectedUser?.name ?? 'Select a person'}</p>
-                <p className="caption">{selectedUser?.job ?? 'Waiting for selection'}</p>
+                <p className="title">{selectedUser?.username ?? 'Select a person'}</p>
+                <p className="caption">{selectedUser?.phone ?? 'Waiting for selection'}</p>
               </div>
             </div>
             <div className="chat-header-actions">
@@ -373,17 +402,35 @@ function App() {
           <div className="message-thread">
             {filteredMessages.map((chat) => {
               const isMine = Number(chat.fromUser) === CURRENT_USER_ID
+
               return (
                 <div key={chat.id} className={`message-row ${isMine ? 'mine' : ''}`}>
                   {!isMine && <div className="avatar tiny" aria-hidden="true" />}
+
                   <div className="bubble">
-                    <p>{chat.message}</p>
-                    <span className="caption">{chat.createdAt ?? 'Just now'}</span>
+                    {/* Text message (if present) */}
+                    {chat.message && <p>{chat.message}</p>}
+
+                    {/* Image attachment (only if it exists) */}
+                    {chat.image && (
+                      <div className="chat-image-wrapper">
+                        <img
+                          src={chat.image}
+                          alt="Chat attachment"
+                          className="chat-image"
+                        />
+                      </div>
+                    )}
+
+                    <span className="caption">
+                      {formatTimestamp(chat.timestamp)}
+                    </span>
                   </div>
                 </div>
               )
             })}
           </div>
+
 
           <div className="message-composer">
             <div className="input-shell">
@@ -448,47 +495,38 @@ function App() {
         <aside className="detail-panel">
           <div className="detail-card">
             <div className="detail-header">
-              <div className="avatar large" aria-hidden="true" />
+              {userDetails?.profileImage ? (
+                <img
+                  src={userDetails.profileImage}
+                  alt={userDetails.username ?? 'User avatar'}
+                  className="avatar large"
+                />
+              ) : (
+                <div className="avatar large" aria-hidden="true" />
+              )}
+
               <div>
-                <p className="title">{userDetails?.name ?? 'User details'}</p>
-                <p className="caption">{userDetails?.job ?? 'Select a person to view more'}</p>
+                <p className="title">{userDetails?.username ?? 'User details'}</p>
+                <p className="caption">
+                  {userDetails?.position ?? 'Select a person to view more'}
+                </p>
               </div>
             </div>
+
             <div className="detail-item">
               <p className="eyebrow">Phone</p>
               <p className="title">{userDetails?.phone ?? 'Not provided'}</p>
             </div>
+
+            <div className="detail-item">
+              <p className="eyebrow">Email</p>
+              <p className="title">{userDetails?.email ?? 'Not provided'}</p>
+            </div>
+
             <div className="detail-item">
               <p className="eyebrow">Address</p>
               <p className="title">{userDetails?.address ?? 'Not provided'}</p>
             </div>
-          </div>
-
-          <div className="detail-card">
-            <div className="card-head">
-              <h3>Attachments</h3>
-              <span className="eyebrow">+ add new</span>
-            </div>
-            {(userDetails?.attachments ?? []).length === 0 ? (
-              <p className="caption">No attachments available.</p>
-            ) : (
-              <div className="attachment-list">
-                {(userDetails?.attachments ?? []).map((file) => (
-                  <div className="attachment-row" key={file.name ?? file.id}>
-                    <span>📎</span>
-                    <div>
-                      <p className="title">{file.name ?? 'Unnamed file'}</p>
-                      <p className="caption">{file.size ?? ''}</p>
-                    </div>
-                    {file.url && (
-                      <a className="time-stamp" href={file.url} target="_blank" rel="noreferrer">
-                        Download
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </aside>
       </div>
